@@ -1,21 +1,30 @@
 <!DOCTYPE html>
 <html>
-  <head> </head>
+  <head>
+    <meta charset="utf-8" />
+  </head>
   <style>
+    body {
+      display: flex;
+      justify-content: center;
+    }
     .board {
       display: grid;
       width: max-content;
     }
     .cell {
-      height: 30px;
-      width: 30px;
-      margin: 2px;
+      height: 2rem;
+      width: 2rem;
+      margin: 1px;
+      font-weight: bold;
       display: flex;
       justify-content: center;
       align-items: center;
+      border-radius: 5%;
     }
     .cell-hidden {
-      background: gray;
+      background: darkgray;
+      box-shadow: 0px 1px 5px black;
     }
     .cell-hidden:hover {
       cursor: pointer;
@@ -28,7 +37,7 @@
     }
   </style>
   <body>
-    <div id="board" class="board"></div>
+    <div id="board" class="board" oncontextmenu="javascript:return false;"></div>
   </body>
   <script>
     window.addEventListener('load', initBoard);
@@ -72,7 +81,16 @@
       } else {
         alert('game over 😞');
       }
-      Object.keys(cells).map(key => cells[key].el.onclick = null);
+      Object.keys(cells).map((key) => (cells[key].el.onclick = null));
+    }
+
+    function revealAllBombs() {
+      Object.keys(cells)
+        .map((key) => cells[key])
+        .filter((cell) => cell.isBomb)
+        .map((cell) => {
+          cell.reveal();
+        });
     }
 
     class Cell {
@@ -97,7 +115,8 @@
             .reduce((acc, key) => [...acc, `${key}:${styles[key]}`], [])
             .join(';')
         );
-        this.el.onclick = () => this.reveal();
+        this.el.onclick = () => this.onClick();
+        this.el.addEventListener('contextmenu', e => this.onRightClick(e), false);
         board.append(this.el);
       }
 
@@ -105,16 +124,43 @@
         return `${row}-${col}`;
       }
 
+      onClick() {
+        if (this.isFlag) {
+          this.toggleFlag();
+        } else if (this.isBomb) {
+          revealAllBombs();
+          this.el.setAttribute('style', 'background:red');
+          endGame(false);
+        } else {
+          this.reveal();
+        }
+      }
+
+      onRightClick(event) {
+        event.preventDefault();
+        this.toggleFlag();
+      }
+
+      toggleFlag() {
+        if (this.isHidden) {
+          this.isFlag = !this.isFlag;
+          this.el.textContent = this.isFlag ? '🚩' : '';
+        }
+      }
+
       reveal() {
         if (this.isHidden) {
           if (this.isBomb) {
-            this.el.append('*');
-            endGame(false);
+            this.el.textContent = '💣';
           } else {
             const n = this.getNeighboringBombCount();
+            const textColor = this.getRevealedColor(n);
+            if (textColor) {
+              this.el.setAttribute('style', `color:${textColor}`);
+            }
             this.el.classList.remove('cell-hidden');
             this.el.classList.add('cell-revealed');
-            this.el.append(String(n || ''));
+            this.el.textContent = String(n || '');
             this.isHidden = false;
             this.revealNeighbors();
             checkForWin();
@@ -140,6 +186,19 @@
 
       getNeighboringBombCount() {
         return this.getNeighbors().filter((cell) => cell.isBomb).length;
+      }
+
+      getRevealedColor(neighboringBombCount) {
+        return [
+          'blue',
+          'green',
+          'red',
+          'purple',
+          'maroon',
+          'turquoise',
+          'black',
+          'gray',
+        ][neighboringBombCount - 1];
       }
 
       revealNeighbors() {
