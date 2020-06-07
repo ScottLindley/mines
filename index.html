@@ -1,0 +1,154 @@
+<!DOCTYPE html>
+<html>
+  <head> </head>
+  <style>
+    .board {
+      display: grid;
+      width: max-content;
+    }
+    .cell {
+      height: 30px;
+      width: 30px;
+      margin: 2px;
+      display: flex;
+      justify-content: center;
+      align-items: center;
+    }
+    .cell-hidden {
+      background: gray;
+    }
+    .cell-hidden:hover {
+      cursor: pointer;
+    }
+    .cell-revealed {
+      background: lightgray;
+    }
+    .cell-revealed:hover {
+      cursor: default;
+    }
+  </style>
+  <body>
+    <div id="board" class="board"></div>
+  </body>
+  <script>
+    window.addEventListener('load', initBoard);
+
+    const GRID_SIZE = 25;
+    const BOMB_COUNT = 50;
+
+    const cells = {};
+
+    function initBoard() {
+      let bombCandidates = [];
+      for (let i = 0; i < GRID_SIZE; i += 1) {
+        for (let j = 0; j < GRID_SIZE; j += 1) {
+          const cell = new Cell({ row: i, col: j });
+          cells[cell.key] = cell;
+          bombCandidates.push(cell);
+        }
+      }
+
+      for (let i = 0; i < BOMB_COUNT; i += 1) {
+        const index = Math.floor(Math.random() * bombCandidates.length);
+        bombCandidates[index].isBomb = true;
+        bombCandidates = [
+          ...bombCandidates.slice(0, index),
+          ...bombCandidates.slice(index + 1),
+        ];
+      }
+    }
+
+    function checkForWin() {
+      const allCells = Object.keys(cells).map((key) => cells[key]);
+      const revealedCount = allCells.filter((cell) => !cell.isHidden).length;
+      if (BOMB_COUNT + revealedCount === allCells.length) {
+        endGame(true);
+      }
+    }
+
+    function endGame(won) {
+      if (won) {
+        alert('you won!');
+      } else {
+        alert('game over 😞');
+      }
+      Object.keys(cells).map(key => cells[key].el.onclick = null);
+    }
+
+    class Cell {
+      constructor({ row, col, isBomb = false }) {
+        this.row = row;
+        this.col = col;
+        this.key = this.genCellKey(row, col);
+        this.isHidden = true;
+        this.isBomb = isBomb;
+        this.el = document.createElement('div');
+        const board = document.getElementById('board');
+        const styles = {
+          'grid-row-start': `${row + 1}`,
+          'grid-row-end': `${row + 1}`,
+          'grid-column-start': `${col + 1}`,
+          'grid-column-end': `${col + 1}`,
+        };
+        this.el.classList.add('cell', 'cell-hidden');
+        this.el.setAttribute(
+          'style',
+          Object.keys(styles)
+            .reduce((acc, key) => [...acc, `${key}:${styles[key]}`], [])
+            .join(';')
+        );
+        this.el.onclick = () => this.reveal();
+        board.append(this.el);
+      }
+
+      genCellKey(row, col) {
+        return `${row}-${col}`;
+      }
+
+      reveal() {
+        if (this.isHidden) {
+          if (this.isBomb) {
+            this.el.append('*');
+            endGame(false);
+          } else {
+            const n = this.getNeighboringBombCount();
+            this.el.classList.remove('cell-hidden');
+            this.el.classList.add('cell-revealed');
+            this.el.append(String(n || ''));
+            this.isHidden = false;
+            this.revealNeighbors();
+            checkForWin();
+          }
+        }
+      }
+
+      getNeighbors() {
+        return [
+          [this.row - 1, this.col - 1],
+          [this.row - 1, this.col],
+          [this.row - 1, this.col + 1],
+          [this.row, this.col - 1],
+          [this.row, this.col + 1],
+          [this.row + 1, this.col - 1],
+          [this.row + 1, this.col],
+          [this.row + 1, this.col + 1],
+        ]
+          .map(([row, col]) => this.genCellKey(row, col))
+          .map((key) => cells[key])
+          .filter((cell) => cell && cell.isHidden);
+      }
+
+      getNeighboringBombCount() {
+        return this.getNeighbors().filter((cell) => cell.isBomb).length;
+      }
+
+      revealNeighbors() {
+        const neighbors = this.getNeighbors();
+        const nonBombNeighbors = neighbors.filter((cell) => !cell.isBomb);
+        if (nonBombNeighbors.length === neighbors.length) {
+          nonBombNeighbors.map((cell) => cell.reveal());
+        }
+      }
+    }
+  </script>
+</html>
